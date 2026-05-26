@@ -11,6 +11,8 @@ const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_CLEANUP_INTERVAL_MS = 60_000;
 
 const app = express();
+const path = require('path');
+app.use(express.static(path.join(__dirname, 'build')));
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: process.env.CLIENT_ORIGIN || 'http://localhost:3000', methods: ['GET', 'POST'] },
