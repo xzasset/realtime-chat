@@ -1,6 +1,8 @@
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
+const Redis = require('ioredis');
 
 const PORT = process.env.PORT || 4000;
 const MAX_USERNAME_LENGTH = 32;
@@ -11,15 +13,16 @@ const RATE_LIMIT_MAX = 10;
 const RATE_LIMIT_CLEANUP_INTERVAL_MS = 60_000;
 
 const app = express();
-const path = require('path');
-app.use(express.static(path.join(__dirname, 'build')));
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: { origin: process.env.CLIENT_ORIGIN || 'http://localhost:3000', methods: ['GET', 'POST'] },
   maxHttpBufferSize: 1e4,
 });
 
-const messageHistory = [];
+const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+
+redis.on('error', (err) => console.error('Redis error:', err));
+
 const rateLimitMap = new Map();
 
 setInterval(() => {
@@ -28,6 +31,8 @@ setInterval(() => {
     if (now - entry.start > RATE_LIMIT_WINDOW_MS * 2) rateLimitMap.delete(id);
   }
 }, RATE_LIMIT_CLEANUP_INTERVAL_MS);
+
+app.use(express.static(path.join(__dirname, 'build')));
 
 function sanitize(str) {
   if (typeof str !== 'string') return '';
@@ -47,27 +52,43 @@ function isRateLimited(socketId) {
   return false;
 }
 
+async function pushToHistory(msg) {
+  await redis.lpush('chat:history', JSON.stringify(msg));
+  await redis.ltrim('chat:history', 0, MAX_HISTORY - 1);
+}
+
+async function getHistory() {
+  const raw = await redis.lrange('chat:history', 0, -1);
+  return raw.map((s) => JSON.parse(s)).reverse();
+}
+
 function broadcastOnlineCount() {
   io.emit('online', io.engine.clientsCount);
 }
 
-io.on('connection', (socket) => {
+io.on('connection', async (socket) => {
   broadcastOnlineCount();
-  socket.emit('history', messageHistory);
 
-  socket.on('join', (rawUsername) => {
+  try {
+    const history = await getHistory();
+    socket.emit('history', history);
+  } catch (err) {
+    console.error('Failed to load history:', err);
+    socket.emit('history', []);
+  }
+
+  socket.on('join', async (rawUsername) => {
     if (socket.data.username) return;
 
     const username = sanitize(String(rawUsername || '').trim()).slice(0, MAX_USERNAME_LENGTH) || 'Аноним';
     socket.data.username = username;
 
     const event = { id: `sys-${Date.now()}-${socket.id}`, type: 'system', text: `${username} joined`, timestamp: Date.now() };
-    messageHistory.push(event);
-    if (messageHistory.length > MAX_HISTORY) messageHistory.shift();
+    await pushToHistory(event);
     io.emit('system', event);
   });
 
-  socket.on('message', (rawText) => {
+  socket.on('message', async (rawText) => {
     if (!socket.data.username) return;
 
     if (isRateLimited(socket.id)) {
@@ -84,8 +105,7 @@ io.on('connection', (socket) => {
       text,
       timestamp: Date.now(),
     };
-    messageHistory.push(msg);
-    if (messageHistory.length > MAX_HISTORY) messageHistory.shift();
+    await pushToHistory(msg);
     io.emit('message', msg);
   });
 
@@ -94,7 +114,7 @@ io.on('connection', (socket) => {
     socket.broadcast.emit('typing', { username: socket.data.username, isTyping: Boolean(isTyping) });
   });
 
-  socket.on('disconnect', () => {
+  socket.on('disconnect', async () => {
     rateLimitMap.delete(socket.id);
     broadcastOnlineCount();
 
@@ -102,8 +122,7 @@ io.on('connection', (socket) => {
     if (!username) return;
 
     const event = { id: `sys-${Date.now()}-${socket.id}`, type: 'system', text: `${username} left`, timestamp: Date.now() };
-    messageHistory.push(event);
-    if (messageHistory.length > MAX_HISTORY) messageHistory.shift();
+    await pushToHistory(event);
     io.emit('system', event);
   });
 });
