@@ -397,3 +397,79 @@ html, body, #root {
   .msg-bubble-wrap { max-width: 82%; }
   .online-badge { display: none; }
 }
+
+/* ── AUTH ── */
+.auth-tabs {
+  display: flex;
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  gap: 3px;
+}
+
+.auth-tab {
+  flex: 1;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 0.85rem;
+  padding: 7px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.auth-tab.active {
+  background: var(--surface2);
+  color: var(--text);
+}
+.auth-tab:hover:not(.active) { color: var(--sub); }
+
+.join-input-col { display: flex; flex-direction: column; width: 100%; gap: 8px; }
+
+.auth-error {
+  font-size: 0.8rem;
+  color: var(--danger);
+  font-family: var(--mono);
+  text-align: center;
+  animation: fadeUp 0.2s ease;
+}
+
+.join-btn-full {
+  width: 100%;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-family: var(--font);
+  font-size: 0.95rem;
+  font-weight: 500;
+  padding: 12px;
+  cursor: pointer;
+  transition: background 0.15s, transform 0.1s;
+  margin-top: 4px;
+}
+.join-btn-full:hover:not(:disabled) { background: #7b9bff; }
+.join-btn-full:active:not(:disabled) { transform: scale(0.98); }
+.join-btn-full:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.current-user {
+  font-size: 0.75rem;
+  font-family: var(--mono);
+  color: var(--sub);
+}
+
+.logout-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 0.75rem;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+.logout-btn:hover { border-color: var(--danger); color: var(--danger); }
