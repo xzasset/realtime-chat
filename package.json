@@ -1,6 +1,6 @@
 {
   "name": "realtime-chat",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "scripts": {
     "start": "node server.js",
     "client": "react-scripts start",
